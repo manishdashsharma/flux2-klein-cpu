@@ -1,0 +1,13 @@
+.DS_Store
+.ipynb_checkpoints/
+__pycache__/
+*.pyc
+.venv/
+.env
+*.gguf
+*.safetensors
+*.ckpt
+*.png
+klein4b_bundle/
+klein4b_bundle.zip
+stable-diffusion.cpp/

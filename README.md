@@ -3,49 +3,54 @@
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Model: Apache-2.0](https://img.shields.io/badge/model-Apache--2.0-green.svg)
 
-Run the [FLUX.2 \[klein\] 4B](https://huggingface.co/black-forest-labs/FLUX.2-klein-4B) image model on an ordinary laptop. No GPU, no 24 GB checkpoint, no ComfyUI setup.
+Run the [FLUX.2 \[klein\] 4B](https://huggingface.co/black-forest-labs/FLUX.2-klein-4B) image model on an ordinary laptop. No dedicated GPU, no 24 GB checkpoint, no ComfyUI setup.
 
-Everything is already quantized. Download, run, done. You never have to quantize anything yourself.
+Everything is already quantized and hosted on Hugging Face: **[manishdashsharma/flux2-klein-4b-gguf](https://huggingface.co/manishdashsharma/flux2-klein-4b-gguf)**. Download, run, done.
 
-| Quant | Approx. size | Notes |
-|-------|--------------|-------|
-| `q8_0` | 4.3 GB | Closest to the original quality |
-| `q4_0` | 2.5 GB | Smallest, fastest, small quality loss |
+<p align="center">
+  <img src="docs/sample-cat.png" width="384" alt="a cat sitting on a sofa, generated with the q4_0 model">
+  <br>
+  <sub><code>"a cat sitting on a sofa, photo"</code>, q4_0, 512x512, 4 steps</sub>
+</p>
 
-Together with the text encoder (about 2.4 GB) and the VAE (about 0.3 GB), `q4_0` totals roughly 5 to 6 GB, so it fits in 16 GB of RAM with room to spare.
+| File | Size | Purpose |
+|------|------|---------|
+| `flux-2-klein-4b-q4_0.gguf` | 2.26 GB | Diffusion model, smallest and fastest |
+| `flux-2-klein-4b-q8_0.gguf` | 4.17 GB | Diffusion model, closest to original quality |
+| `Qwen3-4B-Q4_K_S.gguf` | 2.38 GB | Text encoder |
+| `flux2-vae.safetensors` | 0.34 GB | VAE |
+
+You need one diffusion model plus the text encoder and the VAE. With `q4_0` that is about 5 GB, so it fits in 16 GB of RAM with room to spare.
+
+## Tested
+
+| Machine | Quant | Resolution | Time | Peak RAM |
+|---------|-------|------------|------|----------|
+| Apple Silicon Mac, 16 GB (Metal) | q4_0 | 512x512, 4 steps | 61 s | 5.0 GB |
+
+Pure CPU machines (Intel/AMD laptops) will be slower. Results from other hardware are welcome, open an issue or PR.
 
 ## 1. Download
 
-Download these three files into a `models/` folder:
-
-| File | Source |
-|------|--------|
-| `flux-2-klein-4b-Q4_0.gguf` (2.5 GB) or `flux-2-klein-4b-Q8_0.gguf` (4.3 GB) | [leejet/FLUX.2-klein-4B-GGUF](https://huggingface.co/leejet/FLUX.2-klein-4B-GGUF) |
-| `Qwen3-4B-Q4_K_S.gguf` (text encoder) | [unsloth/Qwen3-4B-GGUF](https://huggingface.co/unsloth/Qwen3-4B-GGUF) |
-| `flux2-vae.safetensors` | [Comfy-Org/flux2-klein-4B](https://huggingface.co/Comfy-Org/flux2-klein-4B/tree/main/split_files/vae) |
-
-Or from the command line:
-
 ```sh
 pip install -U huggingface_hub
-huggingface-cli download leejet/FLUX.2-klein-4B-GGUF flux-2-klein-4b-Q4_0.gguf --local-dir models
-huggingface-cli download unsloth/Qwen3-4B-GGUF Qwen3-4B-Q4_K_S.gguf --local-dir models
-huggingface-cli download Comfy-Org/flux2-klein-4B split_files/vae/flux2-vae.safetensors --local-dir models
+hf download manishdashsharma/flux2-klein-4b-gguf \
+  flux-2-klein-4b-q4_0.gguf Qwen3-4B-Q4_K_S.gguf flux2-vae.safetensors --local-dir models
 ```
 
-The VAE lands in `models/split_files/vae/`. A single-folder bundle is planned for this project's own Hugging Face repo.
+Or download the files manually from the [Hugging Face repo](https://huggingface.co/manishdashsharma/flux2-klein-4b-gguf/tree/main). Verify them against `SHA256SUMS.txt`.
 
 ## 2. Run
 
-1. Get a prebuilt `sd-cli` for your OS from the [stable-diffusion.cpp releases](https://github.com/leejet/stable-diffusion.cpp/releases), or build it from source.
+1. Get a prebuilt `sd-cli` for your OS from the [stable-diffusion.cpp releases](https://github.com/leejet/stable-diffusion.cpp/releases), or build it from source. On macOS, run `xattr -dr com.apple.quarantine .` in the extracted folder if Gatekeeper blocks it.
 2. Run:
 
 ```sh
 ./sd-cli \
-  --diffusion-model models/flux-2-klein-4b-Q4_0.gguf \
+  --diffusion-model models/flux-2-klein-4b-q4_0.gguf \
   --llm models/Qwen3-4B-Q4_K_S.gguf \
-  --vae models/split_files/vae/flux2-vae.safetensors \
-  -p "a lovely cat" \
+  --vae models/flux2-vae.safetensors \
+  -p "a cat sitting on a sofa, photo" \
   --cfg-scale 1.0 --steps 4 --diffusion-fa \
   -W 512 -H 512 -o out.png
 ```
@@ -64,10 +69,11 @@ Tips:
 | Unknown flag error | Flags change between versions. Run `sd-cli --help` and adjust the command. |
 | Out of memory while generating | Use `q4_0`, lower the resolution, add `--offload-to-cpu`. |
 | Output looks noisy or wrong | Check that you used the klein VAE (`flux2-vae.safetensors`) and `--cfg-scale 1.0`. |
+| macOS says the app is damaged or blocked | Run `xattr -dr com.apple.quarantine .` in the `sd-cli` folder. |
 
 ## For maintainers: rebuild the bundle
 
-Only needed to publish new files, for example after a model update or a fine-tune. Users do not need this.
+Only needed to publish new files, for example after a model update or a fine-tune. Users do not need this. The published files were built with stable-diffusion.cpp `master-945-a1ded76`.
 
 1. Import [`notebook/notebook.ipynb`](notebook/notebook.ipynb) into Kaggle (Create -> Import Notebook).
 2. Session options -> **Internet: On**. A CPU session is enough.
@@ -88,6 +94,8 @@ If the convert step rejects a flag, run `sd-cli --help`; flags change between ve
 
 ```
 notebook/notebook.ipynb      Kaggle notebook that builds the quantized bundle
+huggingface/README.md        Model card for the Hugging Face repo
+docs/                        Sample images
 scripts/validate_notebook.py Checks the notebook (used by CI)
 .github/                     Issue templates, PR template, CI
 CONTRIBUTING.md              How to contribute
@@ -100,7 +108,7 @@ Issues and pull requests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) fi
 
 ## Status
 
-The notebook is based on the stable-diffusion.cpp documentation for FLUX.2 klein and GGUF conversion. Generation speed depends heavily on your CPU, so no timings are promised here. If something breaks on a newer stable-diffusion.cpp version, please open an issue.
+The notebook has been run end to end on Kaggle and the resulting `q4_0` model tested on an Apple Silicon Mac. If something breaks on a newer stable-diffusion.cpp version, please open an issue.
 
 ## Credits and licenses
 

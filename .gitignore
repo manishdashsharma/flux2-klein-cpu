@@ -11,3 +11,7 @@ __pycache__/
 klein4b_bundle/
 klein4b_bundle.zip
 stable-diffusion.cpp/
+bin/
+outputs/
+SHA256SUMS.txt
+!docs/*.png

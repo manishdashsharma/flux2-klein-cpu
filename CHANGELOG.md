@@ -7,9 +7,12 @@ All notable changes are documented here. The format follows [Keep a Changelog](h
 ### Added
 - Published quantized files on Hugging Face: manishdashsharma/flux2-klein-4b-gguf
 - Hugging Face model card, sample image and tested results (Apple Silicon, q4_0)
+- `generate.sh`: one-command setup and generation on macOS Apple Silicon and Linux x86_64, with checksum verification
+- Architecture diagram in the README
 
 ### Changed
 - README download section now points to the project's own Hugging Face repo
+- sd-cli link pinned to the tested release `master-945-a1ded76`
 
 ## [0.1.0] - 2026-10-08
 

@@ -22,6 +22,12 @@ Everything is already quantized and hosted on Hugging Face: **[manishdashsharma/
 
 You need one diffusion model plus the text encoder and the VAE. With `q4_0` that is about 5 GB, so it fits in 16 GB of RAM with room to spare.
 
+## How it works
+
+![Architecture: upstream models are quantized in a Kaggle notebook, published to Hugging Face, then downloaded and run locally with sd-cli](docs/architecture.png)
+
+The original model is quantized once on a free Kaggle CPU session and published to Hugging Face. Users only download the small files and run them with `sd-cli`: the Qwen3-4B text encoder turns the prompt into embeddings, FLUX.2 klein denoises the latent in 4 steps, and the VAE decodes it into an image.
+
 ## Tested
 
 | Machine | Quant | Resolution | Time | Peak RAM |
@@ -30,7 +36,34 @@ You need one diffusion model plus the text encoder and the VAE. With `q4_0` that
 
 Pure CPU machines (Intel/AMD laptops) will be slower. Results from other hardware are welcome, open an issue or PR.
 
-## 1. Download
+## Quick start (macOS Apple Silicon, Linux x86_64)
+
+```sh
+git clone https://github.com/manishdashsharma/flux2-klein-cpu.git
+cd flux2-klein-cpu
+./generate.sh "a red fox reading a book under a tree, watercolour"
+```
+
+The first run downloads `sd-cli` and about 5 GB of models into `bin/` and `models/`, verifies every file against `SHA256SUMS.txt`, then saves the image to `outputs/`. Later runs start generating immediately.
+
+```sh
+./generate.sh "a lighthouse at dusk, oil painting" -q q8_0 -W 768 -H 512 -s 42
+./generate.sh --help
+```
+
+| Option | Default | Meaning |
+|--------|---------|---------|
+| `-q`, `--quant` | `q4_0` | `q4_0` (smaller, faster) or `q8_0` (better quality) |
+| `-W`, `-H` | `512` | Image size, multiples of 16 |
+| `-s`, `--seed` | random | Fixed seed for reproducible images |
+| `--steps` | `4` | Sampling steps |
+| `-o`, `--output` | `outputs/<timestamp>.png` | Output file |
+
+On Windows or other platforms, follow the manual setup below.
+
+## Manual setup
+
+### 1. Download the models
 
 ```sh
 pip install -U huggingface_hub
@@ -40,10 +73,11 @@ hf download manishdashsharma/flux2-klein-4b-gguf \
 
 Or download the files manually from the [Hugging Face repo](https://huggingface.co/manishdashsharma/flux2-klein-4b-gguf/tree/main). Verify them against `SHA256SUMS.txt`.
 
-## 2. Run
+### 2. Get sd-cli
 
-1. Get a prebuilt `sd-cli` for your OS from the [stable-diffusion.cpp releases](https://github.com/leejet/stable-diffusion.cpp/releases), or build it from source. On macOS, run `xattr -dr com.apple.quarantine .` in the extracted folder if Gatekeeper blocks it.
-2. Run:
+Download the build for your OS from stable-diffusion.cpp release [`master-945-a1ded76`](https://github.com/leejet/stable-diffusion.cpp/releases/tag/master-945-a1ded76). This is the version the models were quantized and tested with; newer [releases](https://github.com/leejet/stable-diffusion.cpp/releases) usually work too. On macOS, run `xattr -dr com.apple.quarantine .` in the extracted folder if Gatekeeper blocks it.
+
+### 3. Run
 
 ```sh
 ./sd-cli \
@@ -69,6 +103,7 @@ Tips:
 | Unknown flag error | Flags change between versions. Run `sd-cli --help` and adjust the command. |
 | Out of memory while generating | Use `q4_0`, lower the resolution, add `--offload-to-cpu`. |
 | Output looks noisy or wrong | Check that you used the klein VAE (`flux2-vae.safetensors`) and `--cfg-scale 1.0`. |
+| `generate.sh` says checksum mismatch | Delete the file in `models/` and run again; the download was interrupted or corrupted. |
 | macOS says the app is damaged or blocked | Run `xattr -dr com.apple.quarantine .` in the `sd-cli` folder. |
 
 ## For maintainers: rebuild the bundle
@@ -93,9 +128,10 @@ If the convert step rejects a flag, run `sd-cli --help`; flags change between ve
 ## Project layout
 
 ```
+generate.sh                  One-command download and generate
 notebook/notebook.ipynb      Kaggle notebook that builds the quantized bundle
 huggingface/README.md        Model card for the Hugging Face repo
-docs/                        Sample images
+docs/                        Architecture diagram and sample images
 scripts/validate_notebook.py Checks the notebook (used by CI)
 .github/                     Issue templates, PR template, CI
 CONTRIBUTING.md              How to contribute
